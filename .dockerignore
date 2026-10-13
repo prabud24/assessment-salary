@@ -31,6 +31,11 @@
 /tmp/storage/*
 !/tmp/storage/.keep
 
+# Ignore frontend dependencies and build output (rebuilt in the image).
+node_modules/
+**/node_modules/
+/frontend/dist/
+
 # Ignore CI service files.
 /.github
 

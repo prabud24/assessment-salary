@@ -1,0 +1,62 @@
+# Local/production-like stack. Required variables are read from the shell or an
+# untracked `.env` file; see `.env.example` and README.md.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-assessment_salary_production}
+      POSTGRES_USER: ${POSTGRES_USER:-salary}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    image: salary-management:local
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-salary}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-assessment_salary_production}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?Set SECRET_KEY_BASE}
+      RAILS_ALLOWED_HOSTS: ${RAILS_ALLOWED_HOSTS:-localhost}
+      RAILS_LOG_LEVEL: ${RAILS_LOG_LEVEL:-info}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # Explicit, one-off seeding: docker compose --profile tools run --rm seed
+  seed:
+    profiles: ["tools"]
+    image: salary-management:local
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-salary}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-assessment_salary_production}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?Set SECRET_KEY_BASE}
+      RAILS_ALLOWED_HOSTS: ${RAILS_ALLOWED_HOSTS:-localhost}
+      HR_MANAGER_EMAIL: ${HR_MANAGER_EMAIL:?Set HR_MANAGER_EMAIL}
+      HR_MANAGER_PASSWORD: ${HR_MANAGER_PASSWORD:?Set HR_MANAGER_PASSWORD}
+    command: ["./bin/rails", "db:seed"]
+
+volumes:
+  postgres_data:

@@ -78,3 +78,6 @@ Thumbs.db
 /log/
 /storage/
 /tmp/
+# Frontend build copied into the Rails image or public/ for local checks.
+/public/index.html
+/public/assets/

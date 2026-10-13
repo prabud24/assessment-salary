@@ -1,0 +1,62 @@
+#!/bin/bash
+# Smoke test for a running container stack (docker compose up). Credentials come from the
+# environment and are never printed. Usage:
+#   BASE_URL=http://localhost:3000 HR_MANAGER_EMAIL=... HR_MANAGER_PASSWORD=... bin/docker-smoke-test
+set -euo pipefail
+BASE_URL="${BASE_URL:-http://localhost:3000}"
+: "${HR_MANAGER_EMAIL:?}" "${HR_MANAGER_PASSWORD:?}"
+hdr="$(mktemp)"; out="$(mktemp)"; trap 'rm -f "$hdr" "$out"' EXIT
+cookie=""
+fail() { echo "FAIL: $1"; exit 1; }
+
+# Performs a request (status in $status), keeps the session cookie by hand (curl's jar drops Secure cookies received
+# over plain http), stores the body in $out and prints the status code.
+req() {
+  local args=()
+  [ -n "$cookie" ] && args+=(-H "Cookie: $cookie")
+  status="$(curl -s -D "$hdr" -o "$out" -w '%{http_code}' "${args[@]}" "$@")"
+  local set
+  set="$(grep -i '^set-cookie:' "$hdr" | head -1 | sed -E 's/^[^:]+: *//; s/;.*//' | tr -d '\r' || true)"
+  [ -z "$set" ] || cookie="$set"
+}
+# expect CODE MESSAGE curl-args...: runs in the current shell so the session cookie persists.
+expect() { local want="$1" msg="$2"; shift 2; req "$@"; [ "$status" = "$want" ] || fail "$msg (got $status)"; }
+# Sets $token (not run in a subshell, so the updated session cookie is kept).
+csrf() { req "$BASE_URL/api/v1/session" >/dev/null; token="$(python3 -c 'import sys,json;print(json.load(open(sys.argv[1]))["csrf_token"])' "$out")"; }
+
+expect 200 "/up" "$BASE_URL/up"
+expect 200 "index" -H 'Accept: text/html' "$BASE_URL/"
+index="$(cat "$out")"
+expect 200 "SPA deep link" -H 'Accept: text/html' "$BASE_URL/employees/1"
+grep -q 'id="root"' "$out" || fail "deep link did not return the app shell"
+for ext in js css; do
+  asset="$(grep -oE "/assets/[^\"']+\.$ext" <<<"$index" | head -1)"
+  [ -n "$asset" ] || fail "no .$ext asset referenced by index.html"
+  expect 200 "asset $asset" "$BASE_URL$asset"
+  ctype="$(grep -i '^content-type:' "$hdr" | tr -d '\r' | tr 'A-Z' 'a-z')"
+  case "$ext" in
+    js) grep -Eq 'text/javascript|application/javascript' <<<"$ctype" || fail "asset $asset content type ($ctype)" ;;
+    css) grep -q 'text/css' <<<"$ctype" || fail "asset $asset content type ($ctype)" ;;
+  esac
+  expect 404 "missing .$ext should be 404" "$BASE_URL/assets/missing.$ext"
+done
+expect 404 "unknown API route should be 404" "$BASE_URL/api/v1/nope"
+expect 401 "anonymous should be 401" "$BASE_URL/api/v1/employees"
+
+csrf
+flags="$(curl -s -D - -o /dev/null "$BASE_URL/api/v1/session" | grep -i '^set-cookie:')"
+echo "$flags" | grep -qi 'secure' || fail "session cookie must be Secure"
+echo "$flags" | grep -qi 'httponly' || fail "session cookie must be HttpOnly"
+echo "$flags" | grep -qi 'samesite=lax' || fail "session cookie must be SameSite=Lax"
+body="$(python3 -c 'import json,os;print(json.dumps({"email":os.environ["HR_MANAGER_EMAIL"],"password":os.environ["HR_MANAGER_PASSWORD"]}))')"
+login() { req -X POST -H 'Content-Type: application/json' "$@" -d "$body" "$BASE_URL/api/v1/session"; }
+login; [ "$status" = 422 ] || fail "login without CSRF token must be rejected"
+csrf
+login -H "X-CSRF-Token: $token"; [ "$status" = 200 ] || fail "login failed (got $status)"
+expect 200 "authenticated request" "$BASE_URL/api/v1/employees?per_page=1"
+csrf
+expect 422 "logout without CSRF token must be rejected" -X DELETE "$BASE_URL/api/v1/session"
+csrf
+expect 200 "logout" -X DELETE -H "X-CSRF-Token: $token" "$BASE_URL/api/v1/session"
+expect 401 "after logout should be 401" "$BASE_URL/api/v1/employees"
+echo "Smoke test passed"

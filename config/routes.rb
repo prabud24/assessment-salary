@@ -20,6 +20,8 @@ Rails.application.routes.draw do
     end
   end
 
-  # Defines the root path route ("/")
-  # root "posts#index"
+  # Serve the built React app for client-side routes; API, health, and asset paths are excluded.
+  get "*path", to: "spa#show", format: false, constraints: lambda { |request|
+    request.format.html? && !request.path.match?(%r{\A/(api|up)(/|\z)|\.[^/]+\z})
+  }
 end

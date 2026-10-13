@@ -14,3 +14,14 @@ development:
 test:
   <<: *default
   database: assessment_salary_test_db
+# Production: either set DATABASE_URL (it overrides everything below), or set the discrete
+# DB_HOST / POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB variables, which need no URL escaping.
+production:
+  adapter: postgresql
+  encoding: unicode
+  host: <%= ENV["DB_HOST"] %>
+  port: <%= ENV.fetch("DB_PORT", 5432) %>
+  username: <%= ENV["POSTGRES_USER"] %>
+  password: <%= ENV["POSTGRES_PASSWORD"] %>
+  database: <%= ENV["POSTGRES_DB"] %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>

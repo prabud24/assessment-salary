@@ -57,7 +57,23 @@ RSpec.describe "HR manager seed configuration" do
     ).not_to exist
 
     expect { load Rails.root.join("db/seeds.rb") }
-      .not_to change { [ User.count, employees.count, records.count ] }
+      .not_to change { [ User.count, Employee.count, SalaryRecord.count ] }
+    expect(employees.distinct.count(:employee_number)).to eq(10_000)
     expect(records.count).to eq(salary_record_count)
+    expect(SalaryRecord.where(employee_id: employee_ids, effective_to: nil).count).to eq(10_000)
+  end
+
+  # Documented behaviour: the HR password is reset to HR_MANAGER_PASSWORD on every seed run.
+  it "updates the HR password on rerun without creating another user" do
+    ENV["HR_MANAGER_EMAIL"] = "hr@example.com"
+    ENV["HR_MANAGER_PASSWORD"] = "first-password"
+    load Rails.root.join("db/seeds.rb")
+
+    ENV["HR_MANAGER_PASSWORD"] = "second-password"
+    expect { load Rails.root.join("db/seeds.rb") }.not_to change(User, :count)
+
+    user = User.find_by!(email: "hr@example.com")
+    expect(user.authenticate("second-password")).to eq(user)
+    expect(user.authenticate("first-password")).to be(false)
   end
 end

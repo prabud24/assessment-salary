@@ -19,8 +19,9 @@ Rails.application.configure do
   # key such as config/credentials/production.key. This key is used to decrypt credentials (and other encrypted files).
   # config.require_master_key = true
 
-  # Disable serving static files from `public/`, relying on NGINX/Apache to do so instead.
-  # config.public_file_server.enabled = false
+  # Rails serves the built React assets from `public/`; this is explicit so no env var is needed.
+  config.public_file_server.enabled = true
+  config.public_file_server.headers = { "Cache-Control" => "public, max-age=#{1.hour.to_i}" }
 
   # Enable serving of images, stylesheets, and JavaScripts from an asset server.
   # config.asset_host = "http://assets.example.com"
@@ -43,9 +44,18 @@ Rails.application.configure do
 
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
   config.force_ssl = true
+  config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
-  # Skip http-to-https redirect for the default health check endpoint.
-  # config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
+  # Host allow-list (comma-separated), e.g. RAILS_ALLOWED_HOSTS=salary.example.com. Required:
+  # booting without it fails rather than accepting arbitrary Host headers.
+  allowed_hosts = ENV.fetch("RAILS_ALLOWED_HOSTS", "").split(",").map(&:strip).reject(&:empty?)
+  if allowed_hosts.empty? && ENV["SECRET_KEY_BASE_DUMMY"].blank?
+    raise "RAILS_ALLOWED_HOSTS must list the hostnames this app is served from (e.g. salary.example.com)"
+  end
+
+  config.hosts = allowed_hosts
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+
 
   # Log to STDOUT by default
   config.logger = ActiveSupport::Logger.new(STDOUT)
