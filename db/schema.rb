@@ -10,8 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_13_001300) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_13_114930) do
   # These are extensions that must be enabled in order to support this database
+  enable_extension "btree_gist"
   enable_extension "plpgsql"
 
   create_table "employees", force: :cascade do |t|
@@ -31,4 +32,23 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_13_001300) do
     t.check_constraint "employee_number::text ~ '^EMP[0-9]{5}$'::text AND employee_number::text <> 'EMP00000'::text", name: "employees_employee_number_format"
     t.check_constraint "status::text = ANY (ARRAY['active'::character varying, 'inactive'::character varying]::text[])", name: "employees_status_allowed"
   end
+
+  create_table "salary_records", force: :cascade do |t|
+    t.bigint "employee_id", null: false
+    t.decimal "annual_salary", precision: 19, scale: 3, null: false
+    t.string "currency", limit: 3, null: false
+    t.date "effective_from", null: false
+    t.date "effective_to"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["employee_id", "effective_from"], name: "index_salary_records_on_employee_id_and_effective_from"
+    t.index ["employee_id"], name: "index_salary_records_on_employee_id"
+    t.index ["employee_id"], name: "index_salary_records_on_employee_id_open_ended", unique: true, where: "(effective_to IS NULL)"
+    t.check_constraint "annual_salary > 0::numeric", name: "salary_records_annual_salary_positive"
+    t.check_constraint "currency::text ~ '^[A-Z]{3}$'::text", name: "salary_records_currency_format"
+    t.check_constraint "effective_to IS NULL OR effective_to > effective_from", name: "salary_records_effective_period_valid"
+    t.exclusion_constraint "employee_id WITH =, daterange(effective_from, effective_to, '[)'::text) WITH &&", using: :gist, name: "salary_records_no_overlapping_periods"
+  end
+
+  add_foreign_key "salary_records", "employees", on_delete: :restrict
 end
