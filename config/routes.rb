@@ -11,6 +11,9 @@ Rails.application.routes.draw do
       resources :employees, only: %i[index create show update] do
         resources :salary_records, only: %i[index create]
       end
+      get "insights/average_salary_by_country", to: "insights#average_salary_by_country"
+      get "insights/total_salary_by_department", to: "insights#total_salary_by_department"
+      get "insights/salary_increases", to: "insights#salary_increases"
     end
   end
 
