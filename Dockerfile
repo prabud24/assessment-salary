@@ -64,10 +64,11 @@ COPY --from=build /rails /rails
 COPY --from=frontend /frontend/dist /rails/public
 
 # Run and own only the runtime files as a non-root user for security
-RUN groupadd --system --gid 1000 rails && \
-    useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
+# IDs are allocated by the system rather than hardcoded, so an existing uid/gid 1000 cannot conflict.
+RUN (getent group rails >/dev/null || groupadd --system rails) && \
+    (id -u rails >/dev/null 2>&1 || useradd rails --gid rails --create-home --shell /bin/bash) && \
     chown -R rails:rails db log storage tmp
-USER 1000:1000
+USER rails:rails
 
 # Entrypoint prepares the database.
 ENTRYPOINT ["/rails/bin/docker-entrypoint"]
