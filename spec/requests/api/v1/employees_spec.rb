@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Employees API", type: :request do
+  before { authenticate_as_hr_manager }
+
   let(:employee_attributes) do
     {
       employee_number: "EMP00001",
@@ -185,7 +187,7 @@ RSpec.describe "Employees API", type: :request do
   describe "POST /api/v1/employees" do
     it "creates an employee and returns its location" do
       expect {
-        post "/api/v1/employees", params: { employee: employee_attributes }, as: :json
+        post "/api/v1/employees", params: { employee: employee_attributes }, headers: csrf_headers, as: :json
       }.to change(Employee, :count).by(1)
 
       employee = Employee.order(:id).last
@@ -198,7 +200,7 @@ RSpec.describe "Employees API", type: :request do
       invalid_attributes = employee_attributes.merge(employee_number: "invalid")
 
       expect {
-        post "/api/v1/employees", params: { employee: invalid_attributes }, as: :json
+        post "/api/v1/employees", params: { employee: invalid_attributes }, headers: csrf_headers, as: :json
       }.not_to change(Employee, :count)
 
       expect(response).to have_http_status(422)
@@ -208,6 +210,7 @@ RSpec.describe "Employees API", type: :request do
     it "does not accept an id supplied by the client" do
       post "/api/v1/employees",
         params: { employee: employee_attributes.merge(id: 999) },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:created)
@@ -241,6 +244,7 @@ RSpec.describe "Employees API", type: :request do
 
       patch "/api/v1/employees/#{employee.id}",
         params: { employee: { name: " Asha Updated ", department: " Product " } },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:ok)
@@ -253,6 +257,7 @@ RSpec.describe "Employees API", type: :request do
 
       patch "/api/v1/employees/#{employee.id}",
         params: { employee: { status: "terminated" } },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(422)
@@ -265,6 +270,7 @@ RSpec.describe "Employees API", type: :request do
 
       patch "/api/v1/employees/#{employee.id}",
         params: { employee: { id: 999, name: "Updated Name" } },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:ok)
@@ -274,6 +280,7 @@ RSpec.describe "Employees API", type: :request do
     it "returns a consistent not-found error for a missing employee" do
       patch "/api/v1/employees/999999",
         params: { employee: { name: "Updated Name" } },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:not_found)

@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Salary Records API", type: :request do
+  before { authenticate_as_hr_manager }
+
   let(:employee) do
     Employee.create!(
       employee_number: "EMP00001",
@@ -21,13 +23,20 @@ RSpec.describe "Salary Records API", type: :request do
   end
 
   def create_salary_record(overrides = {})
-    SalaryRecord.create!({
+    attributes = {
       employee: employee,
       annual_salary: "50000.000",
       currency: "USD",
       effective_from: business_date - 1.year,
-      effective_to: nil
-    }.merge(overrides))
+      effective_to: nil,
+      created_by: User.find_by!(email: "hr.manager@example.com")
+    }.merge(overrides)
+    if attributes[:effective_to]
+      attributes[:closed_by] = User.find_by!(email: "hr.manager@example.com")
+      attributes[:closed_at] = Time.current
+    end
+
+    SalaryRecord.create!(attributes)
   end
 
   def salary_record_json(record)
@@ -72,6 +81,7 @@ RSpec.describe "Salary Records API", type: :request do
       expect {
         post "/api/v1/employees/#{employee.id}/salary_records",
           params: { salary_record: salary_record_attributes },
+          headers: csrf_headers,
           as: :json
       }.to change(SalaryRecord, :count).by(1)
 
@@ -90,6 +100,7 @@ RSpec.describe "Salary Records API", type: :request do
         params: {
           salary_record: salary_record_attributes.merge(effective_from: effective_date)
         },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:created)
@@ -103,6 +114,7 @@ RSpec.describe "Salary Records API", type: :request do
 
       post "/api/v1/employees/#{employee.id}/salary_records",
         params: { salary_record: attributes },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:unprocessable_entity)
@@ -114,6 +126,7 @@ RSpec.describe "Salary Records API", type: :request do
         params: {
           salary_record: salary_record_attributes.merge(effective_from: "not-a-date")
         },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:unprocessable_entity)
@@ -127,6 +140,7 @@ RSpec.describe "Salary Records API", type: :request do
         params: {
           salary_record: salary_record_attributes.merge(effective_from: (business_date - 1.day).iso8601)
         },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:unprocessable_entity)
@@ -140,6 +154,7 @@ RSpec.describe "Salary Records API", type: :request do
         params: {
           salary_record: salary_record_attributes.merge(annual_salary: "0", currency: "US")
         },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:unprocessable_entity)
@@ -152,6 +167,7 @@ RSpec.describe "Salary Records API", type: :request do
 
       post "/api/v1/employees/#{employee.id}/salary_records",
         params: { salary_record: salary_record_attributes },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:unprocessable_entity)
@@ -163,6 +179,7 @@ RSpec.describe "Salary Records API", type: :request do
 
       post "/api/v1/employees/#{employee.id}/salary_records",
         params: { salary_record: salary_record_attributes },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:unprocessable_entity)
@@ -174,6 +191,7 @@ RSpec.describe "Salary Records API", type: :request do
     it "returns 404 when the employee does not exist" do
       post "/api/v1/employees/999999/salary_records",
         params: { salary_record: salary_record_attributes },
+        headers: csrf_headers,
         as: :json
 
       expect(response).to have_http_status(:not_found)

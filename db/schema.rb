@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_13_114930) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_13_121000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -41,14 +41,39 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_13_114930) do
     t.date "effective_to"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "created_by_id"
+    t.bigint "closed_by_id"
+    t.datetime "closed_at"
+    t.index ["closed_by_id"], name: "index_salary_records_on_closed_by_id"
+    t.index ["created_by_id"], name: "index_salary_records_on_created_by_id"
     t.index ["employee_id", "effective_from"], name: "index_salary_records_on_employee_id_and_effective_from"
     t.index ["employee_id"], name: "index_salary_records_on_employee_id"
     t.index ["employee_id"], name: "index_salary_records_on_employee_id_open_ended", unique: true, where: "(effective_to IS NULL)"
+    t.check_constraint "(closed_by_id IS NULL) = (closed_at IS NULL)", name: "salary_records_closure_audit_consistent"
     t.check_constraint "annual_salary > 0::numeric", name: "salary_records_annual_salary_positive"
     t.check_constraint "currency::text ~ '^[A-Z]{3}$'::text", name: "salary_records_currency_format"
     t.check_constraint "effective_to IS NULL OR effective_to > effective_from", name: "salary_records_effective_period_valid"
     t.exclusion_constraint "employee_id WITH =, daterange(effective_from, effective_to, '[)'::text) WITH &&", using: :gist, name: "salary_records_no_overlapping_periods"
   end
 
+  create_table "sessions", force: :cascade do |t|
+    t.string "session_id", null: false
+    t.text "data"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["session_id"], name: "index_sessions_on_session_id", unique: true
+    t.index ["updated_at"], name: "index_sessions_on_updated_at"
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.string "email", null: false
+    t.string "password_digest", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "lower((email)::text)", name: "index_users_on_lower_email", unique: true
+  end
+
   add_foreign_key "salary_records", "employees", on_delete: :restrict
+  add_foreign_key "salary_records", "users", column: "closed_by_id", on_delete: :restrict
+  add_foreign_key "salary_records", "users", column: "created_by_id", on_delete: :restrict
 end

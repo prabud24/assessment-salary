@@ -10,13 +10,15 @@ RSpec.describe SalaryRecord, type: :model do
       department: "Engineering"
     )
   end
+  let(:user) { User.create!(email: "hr@example.com", password: "spec-password-2026") }
 
   def build_salary_record(overrides = {})
     SalaryRecord.new({
       employee: employee,
       annual_salary: "50000.000",
       currency: "USD",
-      effective_from: Date.new(2026, 1, 1)
+      effective_from: Date.new(2026, 1, 1),
+      created_by: user
     }.merge(overrides))
   end
 
@@ -42,6 +44,10 @@ RSpec.describe SalaryRecord, type: :model do
 
     it "belongs to an employee" do
       expect(build_salary_record.employee).to eq(employee)
+    end
+
+    it "requires an acting user when creating a salary record" do
+      expect(build_salary_record(created_by: nil)).not_to be_valid
     end
   end
 
@@ -144,12 +150,34 @@ RSpec.describe SalaryRecord, type: :model do
         annual_salary: "50000",
         currency: "USD",
         effective_from: Date.new(2026, 1, 1),
-        effective_to: Date.new(2026, 2, 1)
+        effective_to: Date.new(2026, 2, 1),
+        created_by: user,
+        closed_by: user,
+        closed_at: Time.current
       )
-      adjacent_record = build_salary_record(effective_from: Date.new(2026, 2, 1))
+      adjacent_record = build_salary_record(
+        effective_from: Date.new(2026, 2, 1),
+        created_by: user
+      )
 
       expect(adjacent_record).to be_valid
       expect { adjacent_record.save! }.to change(SalaryRecord, :count).by(1)
+    end
+
+    it "requires actor and timestamp audit details when closing a record" do
+      record = SalaryRecord.create!(
+        employee: employee,
+        annual_salary: "50000",
+        currency: "USD",
+        effective_from: Date.new(2026, 1, 1),
+        created_by: user
+      )
+
+      record.effective_to = Date.new(2026, 2, 1)
+
+      expect(record).not_to be_valid
+      expect(record.errors[:closed_by]).to be_present
+      expect(record.errors[:closed_at]).to be_present
     end
   end
 

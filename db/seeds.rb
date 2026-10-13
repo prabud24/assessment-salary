@@ -7,3 +7,11 @@
 #   ["Action", "Comedy", "Drama", "Horror"].each do |genre_name|
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
+
+email = ENV["HR_MANAGER_EMAIL"]
+password = ENV["HR_MANAGER_PASSWORD"]
+abort("Set HR_MANAGER_EMAIL and HR_MANAGER_PASSWORD before running db:seed") if email.blank? || password.blank?
+
+user = User.find_or_initialize_by(email: email)
+user.password = password
+user.save!

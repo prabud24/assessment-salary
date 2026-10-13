@@ -9,12 +9,13 @@ class RecordSalaryChange
     end
   end
 
-  def initialize(employee:, annual_salary:, currency:, effective_from:, business_date:)
+  def initialize(employee:, annual_salary:, currency:, effective_from:, business_date:, user:)
     @employee = employee
     @annual_salary = annual_salary
     @currency = currency
     @effective_from = effective_from
     @business_date = business_date
+    @user = user
   end
 
   def call
@@ -28,7 +29,8 @@ class RecordSalaryChange
         annual_salary: @annual_salary,
         currency: @currency,
         effective_from: @effective_from,
-        effective_to: nil
+        effective_to: nil,
+        created_by: @user
       )
 
       unless salary_record.effective_from
@@ -52,7 +54,13 @@ class RecordSalaryChange
       end
 
       open_record = SalaryRecord.find_by(employee_id: @employee.id, effective_to: nil)
-      open_record&.update!(effective_to: salary_record.effective_from)
+      if open_record
+        open_record.update!(
+          effective_to: salary_record.effective_from,
+          closed_by: @user,
+          closed_at: Time.current
+        )
+      end
       salary_record.save!
 
       success(salary_record)

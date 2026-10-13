@@ -4,6 +4,7 @@ RSpec.describe "Insights API", type: :request do
   let(:business_date) { Date.new(2026, 10, 13) }
 
   before do
+    authenticate_as_hr_manager
     allow(SalaryInsights).to receive(:current_business_date).and_return(business_date)
   end
 
@@ -20,14 +21,19 @@ RSpec.describe "Insights API", type: :request do
 
   def create_salary(employee, amount:, currency: "USD", from:, to: nil)
     previous_open_record = SalaryRecord.find_by(employee_id: employee.id, effective_to: nil)
-    previous_open_record&.update!(effective_to: from)
+    user = User.find_by!(email: "hr.manager@example.com")
+    previous_open_record&.update!(effective_to: from, closed_by: user, closed_at: Time.current)
+    closed_at = Time.current if to
 
     SalaryRecord.create!(
       employee: employee,
       annual_salary: amount,
       currency: currency,
       effective_from: from,
-      effective_to: to
+      effective_to: to,
+      created_by: user,
+      closed_by: (user if to),
+      closed_at:
     )
   end
 

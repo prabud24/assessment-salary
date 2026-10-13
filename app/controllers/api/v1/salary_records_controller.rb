@@ -27,7 +27,8 @@ module Api
           annual_salary: attributes[:annual_salary],
           currency: attributes[:currency],
           effective_from: effective_from,
-          business_date: Time.current.in_time_zone("Asia/Kolkata").to_date
+          business_date: Time.current.in_time_zone("Asia/Kolkata").to_date,
+          user: current_user
         ).call
 
         if result.success?

@@ -157,6 +157,7 @@ erDiagram
   5. Same-origin hosting means no cross-origin requests are allowed, so no CORS configuration is needed.
 - **Testing:** request specs cover rejection of state-changing requests with a missing or wrong token, and frontend tests cover the client sending the header.
 - **Credentials:** the HR Manager account is created by the seed process from environment configuration. No credentials are committed.
+- **Rails API session configuration:** cookie and session middleware are explicitly enabled for the API-only application. Session state is stored in PostgreSQL; the browser cookie is HttpOnly and SameSite=Lax, and is Secure in production. `db:seed` requires `HR_MANAGER_EMAIL` and `HR_MANAGER_PASSWORD` and fails when either is absent.
 - **Audit attribution:** each salary record stores `created_by` and `created_at`. When a change closes the previous record, that record stores `closed_by` and `closed_at`. This satisfies the requirement to identify who created records and who changed prior end dates, using no extra dependency.
 - **Trade-off:** this is attribution, not a full event log. Because records are immutable except for being closed once, nothing is lost. Reading salary data is not audited in the MVP.
 - **Privacy:** salary amounts, emails, and credentials are excluded from application logs through parameter filtering, and error responses never echo salary data. All traffic uses HTTPS. Data is synthetic.

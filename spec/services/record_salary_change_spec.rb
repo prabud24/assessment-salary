@@ -12,6 +12,7 @@ RSpec.describe RecordSalaryChange do
   end
 
   let(:business_date) { Date.new(2026, 1, 1) }
+  let(:user) { User.create!(email: "hr@example.com", password: "spec-password-2026") }
 
   def record_salary_change(overrides = {})
     attributes = {
@@ -19,7 +20,8 @@ RSpec.describe RecordSalaryChange do
       annual_salary: "60000.000",
       currency: "USD",
       effective_from: Date.new(2026, 1, 1),
-      business_date: business_date
+      business_date: business_date,
+      user: user
     }.merge(overrides)
 
     described_class.new(**attributes).call
@@ -31,7 +33,8 @@ RSpec.describe RecordSalaryChange do
       annual_salary: "50000.000",
       currency: "USD",
       effective_from: Date.new(2025, 1, 1),
-      effective_to: nil
+      effective_to: nil,
+      created_by: user
     }.merge(overrides))
   end
 
@@ -42,7 +45,8 @@ RSpec.describe RecordSalaryChange do
           employee: employee,
           annual_salary: "60000",
           currency: "USD",
-          effective_from: Date.new(2026, 1, 1)
+          effective_from: Date.new(2026, 1, 1),
+          user: user
         )
       }.to raise_error(ArgumentError, /business_date/)
     end
@@ -69,6 +73,7 @@ RSpec.describe RecordSalaryChange do
         effective_from: business_date,
         effective_to: nil
       )
+      expect(result.salary_record.created_by).to eq(user)
     end
 
     it "closes the open-ended record and creates the new open-ended record" do
@@ -79,6 +84,8 @@ RSpec.describe RecordSalaryChange do
 
       expect(result).to be_success
       expect(previous_record.reload.effective_to).to eq(effective_date)
+      expect(previous_record.closed_by).to eq(user)
+      expect(previous_record.closed_at).to be_present
       expect(result.salary_record.effective_from).to eq(effective_date)
       expect(result.salary_record.effective_to).to be_nil
     end

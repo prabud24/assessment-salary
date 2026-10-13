@@ -8,6 +8,9 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       get "health", to: "health#show"
+      get "session", to: "sessions#show"
+      post "session", to: "sessions#create"
+      delete "session", to: "sessions#destroy"
       resources :employees, only: %i[index create show update] do
         resources :salary_records, only: %i[index create]
       end
