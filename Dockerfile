@@ -67,6 +67,7 @@ COPY --from=frontend /frontend/dist /rails/public
 # IDs are allocated by the system rather than hardcoded, so an existing uid/gid 1000 cannot conflict.
 RUN (getent group rails >/dev/null || groupadd --system rails) && \
     (id -u rails >/dev/null 2>&1 || useradd rails --gid rails --create-home --shell /bin/bash) && \
+    mkdir -p db log storage tmp && \
     chown -R rails:rails db log storage tmp
 USER rails:rails
 
